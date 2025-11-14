@@ -13,4 +13,4 @@ For Valon: Potential Datasets:
 - [Steam Monthly Average Players (7 columns, 6700+ instances)](https://www.kaggle.com/datasets/lunthu/steam-monthly-average-players)
 - [Apartment Renting Prices (10 columns, 4300+ instances)](https://www.kaggle.com/datasets/willianoliveiragibin/apartment-market-prices)
 - [(HIGH QUALITY DATA) Social Media Addictions & students (10 columns, 1000~ instances)](https://www.kaggle.com/datasets/adilshamim8/social-media-addiction-vs-relationships)
-- [WHO Life Expectancy (22 columns, 2500+ instances)]{https://www.kaggle.com/datasets/kumarajarshi/life-expectancy-who}
+- [WHO Life Expectancy (22 columns, 2500+ instances)](https://www.kaggle.com/datasets/kumarajarshi/life-expectancy-who)
