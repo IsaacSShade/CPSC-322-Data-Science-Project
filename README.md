@@ -16,3 +16,4 @@ For Valon: Potential Datasets:
 - [WHO Life Expectancy (22 columns, 2500+ instances)](https://www.kaggle.com/datasets/kumarajarshi/life-expectancy-who)
 - [Mushroom Classification (23 columns, 4000+ instances)](https://www.kaggle.com/datasets/uciml/mushroom-classification)
 - [Weather Classification (12 columns, 66,000+ instances)](https://www.kaggle.com/datasets/muthuj7/weather-dataset)
+- [Hospital Readmission Dataset (65 columns, 25,000+ instances)](https://www.kaggle.com/datasets/dansbecker/hospital-readmissions)
