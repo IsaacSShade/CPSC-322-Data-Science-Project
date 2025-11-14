@@ -1,4 +1,4 @@
-# Data Science Project - [Mushroom Edibility Classification](https://www.kaggle.com/datasets/uciml/mushroom-classification)
+# Data Science Project - [Weather Category Classification](https://www.kaggle.com/datasets/muthuj7/weather-dataset)
 By Aiden Tabrah and Valon Haslem
 
 ### Project Proposal
