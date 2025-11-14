@@ -14,3 +14,5 @@ For Valon: Potential Datasets:
 - [Apartment Renting Prices (10 columns, 4300+ instances)](https://www.kaggle.com/datasets/willianoliveiragibin/apartment-market-prices)
 - [(HIGH QUALITY DATA) Social Media Addictions & students (10 columns, 1000~ instances)](https://www.kaggle.com/datasets/adilshamim8/social-media-addiction-vs-relationships)
 - [WHO Life Expectancy (22 columns, 2500+ instances)](https://www.kaggle.com/datasets/kumarajarshi/life-expectancy-who)
+- [Mushroom Classification (23 columns, 4000+ instances)](https://www.kaggle.com/datasets/uciml/mushroom-classification)
+- [Weather Classification (12 columns, 66,000+ instances)](https://www.kaggle.com/datasets/muthuj7/weather-dataset)
