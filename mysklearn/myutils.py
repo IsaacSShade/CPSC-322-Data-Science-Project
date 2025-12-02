@@ -13,6 +13,58 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mysklearn import myevaluation
 
+def calc_entropy(x_vals, y_col, idx):
+    # if len(x_vals[0]) == 1: # 1 column base separator (stupid)
+    #     x_col = x_vals
+    # else:
+    x_col = [x_val[idx] for x_val in x_vals]
+    entropy = sum([(x_col.count(kx)/len(x_col))*
+                    sum([sum([-1 for x, y in zip(x_col, y_col) if (x,y) == (kx, ky)])/x_col.count(kx)*np.log2(sum([1 for x, y in zip(x_col, y_col) if (x,y) == (kx, ky)])/x_col.count(kx))# entropy formula
+                        if sum([1 for x, y in zip(x_col, y_col) if (x,y) == (kx, ky)]) != 0 else 0 # log0 case
+                        for ky in set(y_col) ]) # iterate through ky cases = should result in sum of leading fractions to 1
+                   for kx in set(x_col)]) # iterate through kx, should result in leading sum adding up to 1
+    return entropy
+
+def select_attribute(instances, attributes):
+    # TODO: implement the general Enew algorithm for attribute selection
+    # for each available attribute
+    #     for each value in the attribute's domain
+    #          calculate the entropy for the value's partition
+    #     calculate the weighted average for the parition entropies
+    # select that attribute with the smallest Enew entropy
+    x_vals = [instance[:-1] for instance in instances]
+    y_vals = [instance[-1] for instance in instances]
+    entropy = {idx: calc_entropy(x_vals=x_vals, y_col =y_vals, idx= idx) for idx in range(len(attributes))}
+    choice_idx = min(entropy, key = entropy.get)        
+    
+    return attributes[choice_idx]
+
+def all_same_class(instances):
+    # get the class label of the first instance.
+    first_class = instances[0][-1]
+    for instance in instances:
+        # if any label differs, return False immediately.
+        if instance[-1] != first_class:
+            return False
+        
+    # if the loop completes without finding differences, return True.
+    return True 
+
+def compute_random_subset(values, num_values):
+    # let's use np.random.shuffle()
+    values_copy = values.copy()
+    np.random.shuffle(values_copy) # inplace
+    return values_copy[:num_values]
+
+def vote(vals):
+    '''
+    args: vals, 1d list
+    returns:
+    majority vote, if tie, returns sorted first term alphabetically
+    '''
+    votes = {val: vals.count(val) for val in set(vals)}
+    max_votes = max(votes.values())
+    return min((k for k, v in votes.items() if v == max_votes))
 
 def DOE_discretizer(mpg):
   """Outputs the label associeated with the given mpg
@@ -858,3 +910,13 @@ def convert_date_to_numeric(dates):
       timestamp_list.append("NA")
 
   return timestamp_list
+
+
+# def normalized_discretizer(x):
+#   '''Returns discretized value for normalized data
+#   args: x value
+
+#   returns: discretized value
+  
+#   '''
+#   return 

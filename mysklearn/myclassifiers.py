@@ -511,3 +511,129 @@ class MyDecisionTreeClassifier:
             You will need to install graphviz in the Docker container as shown in class to complete this method.
         """
         pass # TODO: (BONUS) fix this
+
+from mysklearn.myevaluation import bootstrap_sample
+class MyRandomForestClassifier:
+    """Represents a Random Forest classifier.
+
+    Notes:
+        Uses raw TDIDT trees (nested lists) as base learners.
+        Bootstraps training data, randomly selects F attributes per split,
+        and keeps the M most accurate trees out of N generated.
+    """
+    
+
+    def __init__(self, N=20, M=7, F=2):
+        """Initializer for Random Forest.
+
+        Args:
+            N (int): number of trees to generate
+            M (int): number of best trees to keep
+            F (int): number of random attributes per split
+        """
+        self.N = N
+        self.M = M
+        self.F = F
+        self.trees = []
+        self.attribute_names = None
+
+    def fit(self, X, y):
+        """Fits the Random Forest model.
+
+        Steps:
+        1. Build attribute names att0, att1, ...
+        2. Repeat N times:
+           a. Bootstrap sample the data
+           b. Build a TDIDT tree using random attribute subsets
+           c. Evaluate tree using its OOB samples
+        3. Select top M trees
+        """
+        # Build attribute names
+        num_features = len(X[0])
+        self.attribute_names = ["att" + str(i) for i in range(num_features)]
+
+        trees_with_scores = []
+
+        for _ in range(self.N):
+            # Bootstrap sample
+            X_train, X_oob, y_train, y_oob = bootstrap_sample(X, y)
+
+            # Combine training rows w/ labels
+            train_instances = [xrow[:] + [y_val] for xrow, y_val in zip(X_train, y_train)]
+            available_attributes = list(range(num_features))
+
+            # Build tree with random attribute subsets
+            tree = self._tdidt_random(train_instances, available_attributes)
+
+            # Evaluate using OOB set
+            if len(X_oob) > 0:
+                preds = [myutils.dt_predict_instance(x, tree, self.attribute_names) for x in X_oob]
+                score = myutils.accuracy_score(y_oob, preds)
+            else:
+                score = 0.0  # no OOB samples, rare case
+
+            trees_with_scores.append((tree, score))
+
+        # Sort by descending accuracy
+        trees_with_scores.sort(key=lambda t: t[1], reverse=True)
+
+        # Keep top M
+        self.trees = [t for t, _ in trees_with_scores[:self.M]]
+
+    def _tdidt_random(self, instances, available_attributes):
+        """Builds a TDIDT decision tree using random subsets of attributes (size F)."""
+        class_index = len(instances[0]) - 1
+        class_labels = [row[class_index] for row in instances]
+
+        # base cases
+        if myutils.all_same_class(class_labels):
+            return ["leaf", class_labels[0], class_labels.count(class_labels[0]), len(class_labels)]
+
+        if len(available_attributes) == 0:
+            return ["leaf", myutils.vote(class_labels), class_labels.count(myutils.vote(class_labels)), len(class_labels)]
+
+        # Randomly pick F attributes
+        if len(available_attributes) <= self.F:
+            attrs_to_consider = available_attributes[:]
+        else:
+            attrs_to_consider = myutils.compute_random_subset(available_attributes, self.F)
+            attrs_to_consider = [available_attributes[i] for i in attrs_to_consider]
+
+        # Select best attribute among random subset
+        best_att = myutils.select_attribute(instances, attrs_to_consider)
+
+        # Build subtree
+        tree = [self.attribute_names[best_att], []]
+        new_available = [a for a in available_attributes if a != best_att]
+
+        partitions = myutils.dt_partition_instances(instances, best_att)
+        for value in sorted(partitions.keys()):
+            subset = partitions[value]
+            if len(subset) == 0:
+                majority = myutils.vote(class_labels)
+                subtree = ["leaf", majority, class_labels.count(myutils.vote(class_labels)), len(class_labels)]
+            else:
+                subtree = self._tdidt_random(subset, new_available)
+            tree[1].append([value, subtree])
+
+        return tree
+
+    def predict(self, X_test):
+        """Predicts labels for X_test using majority vote across M trees."""
+        def depth_charge(x_val, tree):   
+            for i, element in enumerate(tree, start = 2): # we know we split on attribute, leading to value
+                if x_val[int(tree[1][-1])] == element[1]: # find corresponding value
+                    # check for leaf
+                    if element[2][0] == 'Leaf':
+                        return element[2][1] # return that classifier value
+                    else: # must be another attribute
+                        return depth_charge(x_val, tree = element[2])
+        
+        predictions = []
+        for x in X_test:
+            votes = []
+            for tree in self.trees:
+                pred = depth_charge(x, tree) # do we need self.attribute_names?
+                votes.append(pred)
+            predictions.append(myutils.vote(votes))
+        return predictions
