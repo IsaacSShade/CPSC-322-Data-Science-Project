@@ -13,6 +13,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mysklearn import myevaluation
 
+def high_low_discretizer(col, use_mean = True):
+  '''discretizes column of continuous variables based on high or low from median or mean, specified by presence of outliers
+    ARGS: col -- column of continuous data
+    use_mean -- default is True. if true, uses mean to partition data. if false, uses median
+
+    RETURNS: list of discretized values either "high" or "low"
+  '''
+  if use_mean:
+    crit_val = np.mean(col)
+  else: # use median
+    crit_val = np.median(col)
+  
+  return ['high' if col[idx] >= crit_val else 'low' for idx in range(len(col))]
+
+
+
 def norm_list(col):
   col_max, col_min = max(col), min(col)
   return [ (val - col_min)/(col_max - col_min) for val in col]
