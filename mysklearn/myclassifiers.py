@@ -564,14 +564,14 @@ class MyRandomForestClassifier:
             subset_attributes = myutils.compute_random_subset(available_attributes, self.F)
 
             # Build tree with random attribute subsets
-            # tree = self._tdidt_random(train_instances, available_attributes)
+            attribute_domains = [
+                                     set(instance[j] for instance in train_instances)
+                                     for j in range(num_features)
+                                 ]
             print(y_train)
             tree = myutils.tdidt(instances= train_instances,
                                  available_attribute_indexes= subset_attributes,
-                                 attribute_domains= [
-                                     set([instance[idx] for instance in train_instances])
-                                     for idx in subset_attributes
-                                 ],
+                                 attribute_domains= attribute_domains,
                                  class_label_domain=set(y_train),
                                  parent_instance_count= len(X_train))
 
@@ -590,44 +590,7 @@ class MyRandomForestClassifier:
         # Keep top M
         self.trees = [t for t, _ in trees_with_scores[:self.M]]
 
-    # def _tdidt_random(self, instances, available_attributes):
-    #     """Builds a TDIDT decision tree using random subsets of attributes (size F)."""
-    #     class_index = len(instances[0]) - 1
-    #     class_labels = [row[class_index] for row in instances]
 
-    #     # base cases
-    #     if myutils.all_same_class(class_labels):
-    #         return ["Leaf", class_labels[0], class_labels.count(class_labels[0]), len(class_labels)]
-
-    #     if len(available_attributes) == 0:
-    #         return ["Leaf", myutils.vote(class_labels), class_labels.count(myutils.vote(class_labels)), len(class_labels)]
-
-    #     # Randomly pick F attributes
-    #     if len(available_attributes) <= self.F:
-    #         attrs_to_consider = available_attributes[:]
-    #     else:
-    #         attrs_to_consider = myutils.compute_random_subset(available_attributes, self.F)
-    #         attrs_to_consider = [available_attributes[i] for i in attrs_to_consider]
-
-    #     # Select best attribute among random subset
-    #     best_att = myutils.select_attribute(instances, attrs_to_consider)
-
-    #     # Build subtree
-    #     tree = [self.attribute_names[best_att], []]
-    #     new_available = [a for a in available_attributes if a != best_att]
-
-    #     partitions = myutils.partition_instances(instances, best_att, self.attribute_names)
-
-    #     for value in sorted(partitions.keys()):
-    #         subset = partitions[value]
-    #         if len(subset) == 0:
-    #             majority = myutils.vote(class_labels)
-    #             subtree = ["Leaf", majority, class_labels.count(myutils.vote(class_labels)), len(class_labels)]
-    #         else:
-    #             subtree = self._tdidt_random(subset, new_available)
-    #         tree[1].append([value, subtree])
-
-    #     return tree
 
     def predict(self, X_test, t = None):
         """Predicts labels for X_test using majority vote across M trees."""
