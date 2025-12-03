@@ -568,7 +568,7 @@ class MyRandomForestClassifier:
                                      set(instance[j] for instance in train_instances)
                                      for j in range(num_features)
                                  ]
-            print(y_train)
+            
             tree = myutils.tdidt(instances= train_instances,
                                  available_attribute_indexes= subset_attributes,
                                  attribute_domains= attribute_domains,
