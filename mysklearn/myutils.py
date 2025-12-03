@@ -13,6 +13,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mysklearn import myevaluation
 
+def convert_zeros_to_mean(col):
+  non_zeros = [val for val in col if val != 0]
+  non_zeros_mean = sum(non_zeros)/len(non_zeros)
+  return [val if val != 0 else non_zeros_mean for val in col]
+
 def high_low_discretizer(col, use_mean = True):
   '''discretizes column of continuous variables based on high or low from median or mean, specified by presence of outliers
     ARGS: col -- column of continuous data
