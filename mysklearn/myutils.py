@@ -334,22 +334,14 @@ def get_euclidean_distance(test_list, training_list):
     distance_list (list of list of floats): A list of all distances from one test instance to each training instance
   """
 
-  distance_list = []
+  X_test = np.asarray(test_list, dtype=float) 
+  X_train = np.asarray(training_list, dtype=float) 
 
-  for base_instance in test_list:
-    instance_distance_list = []
+  diff = X_test[:, None, :] - X_train[None, :, :]
 
-    for comparison_instance in training_list:
-      # We can include the base_instance because it'll equal 0 in the sum
-      sum = 0
-      for k, _ in enumerate(comparison_instance):
-        sum += (base_instance[k] - comparison_instance[k]) ** 2
+  dists = np.sqrt(np.sum(diff * diff, axis=2))
 
-      instance_distance_list.append(np.sqrt(sum))
-
-    distance_list.append(instance_distance_list)
-
-  return distance_list
+  return dists.tolist()
 
 
 def get_nearest_neighbors(all_distance_list, k):
@@ -601,9 +593,8 @@ def cross_val_predict(classifier, X, y, num_splits=10, random_state=None, shuffl
 
     fold_accuracies.append(accuracy)
     fold_errors.append(error)
-    for i in range(len(y_pred)):
-      fold_predicted.append(y_pred[i])
-      fold_true.append(y_test[i])
+    fold_predicted.extend(y_pred)
+    fold_true.extend(y_test)
 
   mean_accuracy = sum(fold_accuracies) / \
       len(fold_accuracies) if fold_accuracies else 0.0
