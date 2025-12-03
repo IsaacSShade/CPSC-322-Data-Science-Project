@@ -13,6 +13,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mysklearn import myevaluation
 
+def norm_list(col):
+  col_max, col_min = max(col), min(col)
+  return [ (val - col_min)/(col_max - col_min) for val in col]
+
+def partition_instances(instances, attribute, header):
+    # this is group by attribute domain (not values of attribute in instances)
+    # Returns a dictionary: {attribute_value: [instances]}
+    att_index = header.index(attribute)
+    att_domain = set([instance[att_index] for instance in instances])
+    partitions = {}
+    for att_value in att_domain: # "Junior" -> "Mid" -> "Senior"
+        partitions[att_value] = []
+        for instance in instances:
+            if instance[att_index] == att_value:
+                partitions[att_value].append(instance)
+
+    return partitions
+
 def calc_entropy(x_vals, y_col, idx):
     # if len(x_vals[0]) == 1: # 1 column base separator (stupid)
     #     x_col = x_vals

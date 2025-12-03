@@ -512,7 +512,7 @@ class MyDecisionTreeClassifier:
         """
         pass # TODO: (BONUS) fix this
 
-from mysklearn.myevaluation import bootstrap_sample
+from mysklearn.myevaluation import bootstrap_sample, accuracy_score
 class MyRandomForestClassifier:
     """Represents a Random Forest classifier.
 
@@ -560,15 +560,25 @@ class MyRandomForestClassifier:
 
             # Combine training rows w/ labels
             train_instances = [xrow[:] + [y_val] for xrow, y_val in zip(X_train, y_train)]
-            available_attributes = list(range(num_features))
+            available_attributes = list(range(num_features)) # take a subset right now
+            subset_attributes = myutils.compute_random_subset(available_attributes, self.F)
 
             # Build tree with random attribute subsets
-            tree = self._tdidt_random(train_instances, available_attributes)
+            # tree = self._tdidt_random(train_instances, available_attributes)
+            print(y_train)
+            tree = myutils.tdidt(instances= train_instances,
+                                 available_attribute_indexes= subset_attributes,
+                                 attribute_domains= [
+                                     set([instance[idx] for instance in train_instances])
+                                     for idx in subset_attributes
+                                 ],
+                                 class_label_domain=set(y_train),
+                                 parent_instance_count= len(X_train))
 
             # Evaluate using OOB set
             if len(X_oob) > 0:
-                preds = [myutils.dt_predict_instance(x, tree, self.attribute_names) for x in X_oob]
-                score = myutils.accuracy_score(y_oob, preds)
+                preds = self.predict(X_oob, tree)
+                score = accuracy_score(y_oob, preds)
             else:
                 score = 0.0  # no OOB samples, rare case
 
@@ -580,60 +590,61 @@ class MyRandomForestClassifier:
         # Keep top M
         self.trees = [t for t, _ in trees_with_scores[:self.M]]
 
-    def _tdidt_random(self, instances, available_attributes):
-        """Builds a TDIDT decision tree using random subsets of attributes (size F)."""
-        class_index = len(instances[0]) - 1
-        class_labels = [row[class_index] for row in instances]
+    # def _tdidt_random(self, instances, available_attributes):
+    #     """Builds a TDIDT decision tree using random subsets of attributes (size F)."""
+    #     class_index = len(instances[0]) - 1
+    #     class_labels = [row[class_index] for row in instances]
 
-        # base cases
-        if myutils.all_same_class(class_labels):
-            return ["leaf", class_labels[0], class_labels.count(class_labels[0]), len(class_labels)]
+    #     # base cases
+    #     if myutils.all_same_class(class_labels):
+    #         return ["Leaf", class_labels[0], class_labels.count(class_labels[0]), len(class_labels)]
 
-        if len(available_attributes) == 0:
-            return ["leaf", myutils.vote(class_labels), class_labels.count(myutils.vote(class_labels)), len(class_labels)]
+    #     if len(available_attributes) == 0:
+    #         return ["Leaf", myutils.vote(class_labels), class_labels.count(myutils.vote(class_labels)), len(class_labels)]
 
-        # Randomly pick F attributes
-        if len(available_attributes) <= self.F:
-            attrs_to_consider = available_attributes[:]
-        else:
-            attrs_to_consider = myutils.compute_random_subset(available_attributes, self.F)
-            attrs_to_consider = [available_attributes[i] for i in attrs_to_consider]
+    #     # Randomly pick F attributes
+    #     if len(available_attributes) <= self.F:
+    #         attrs_to_consider = available_attributes[:]
+    #     else:
+    #         attrs_to_consider = myutils.compute_random_subset(available_attributes, self.F)
+    #         attrs_to_consider = [available_attributes[i] for i in attrs_to_consider]
 
-        # Select best attribute among random subset
-        best_att = myutils.select_attribute(instances, attrs_to_consider)
+    #     # Select best attribute among random subset
+    #     best_att = myutils.select_attribute(instances, attrs_to_consider)
 
-        # Build subtree
-        tree = [self.attribute_names[best_att], []]
-        new_available = [a for a in available_attributes if a != best_att]
+    #     # Build subtree
+    #     tree = [self.attribute_names[best_att], []]
+    #     new_available = [a for a in available_attributes if a != best_att]
 
-        partitions = myutils.dt_partition_instances(instances, best_att)
-        for value in sorted(partitions.keys()):
-            subset = partitions[value]
-            if len(subset) == 0:
-                majority = myutils.vote(class_labels)
-                subtree = ["leaf", majority, class_labels.count(myutils.vote(class_labels)), len(class_labels)]
-            else:
-                subtree = self._tdidt_random(subset, new_available)
-            tree[1].append([value, subtree])
+    #     partitions = myutils.partition_instances(instances, best_att, self.attribute_names)
 
-        return tree
+    #     for value in sorted(partitions.keys()):
+    #         subset = partitions[value]
+    #         if len(subset) == 0:
+    #             majority = myutils.vote(class_labels)
+    #             subtree = ["Leaf", majority, class_labels.count(myutils.vote(class_labels)), len(class_labels)]
+    #         else:
+    #             subtree = self._tdidt_random(subset, new_available)
+    #         tree[1].append([value, subtree])
 
-    def predict(self, X_test):
+    #     return tree
+
+    def predict(self, X_test, t = None):
         """Predicts labels for X_test using majority vote across M trees."""
-        def depth_charge(x_val, tree):   
-            for i, element in enumerate(tree, start = 2): # we know we split on attribute, leading to value
-                if x_val[int(tree[1][-1])] == element[1]: # find corresponding value
-                    # check for leaf
-                    if element[2][0] == 'Leaf':
-                        return element[2][1] # return that classifier value
-                    else: # must be another attribute
-                        return depth_charge(x_val, tree = element[2])
+
+        if t is None: # assume for all, majority voting
+            predictions = []
+            for x in X_test:
+                votes = []
+                for tree in self.trees:
+                    pred = myutils.classify_instance_with_tree(x, tree) # do we need self.attribute_names?
+                    votes.append(pred)
+                predictions.append(myutils.vote(votes))
+            return predictions
         
-        predictions = []
-        for x in X_test:
-            votes = []
-            for tree in self.trees:
-                pred = depth_charge(x, tree) # do we need self.attribute_names?
-                votes.append(pred)
-            predictions.append(myutils.vote(votes))
-        return predictions
+        else: # tree has value
+            predictions = []
+            for x in X_test:
+                pred = myutils.classify_instance_with_tree(x, t)
+                predictions.append(t)
+            return predictions
