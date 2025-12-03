@@ -112,7 +112,6 @@ def kfold_split(X, n_splits=5, random_state=None, shuffle=False):
     
     return folds
 
-# BONUS function
 def stratified_kfold_split(X, y, n_splits=5, random_state=None, shuffle=False):
     """Split dataset into stratified cross validation folds.
 
@@ -134,8 +133,45 @@ def stratified_kfold_split(X, y, n_splits=5, random_state=None, shuffle=False):
         Loosely based on sklearn's StratifiedKFold split():
             https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.StratifiedKFold.html#sklearn.model_selection.StratifiedKFold
     """
-    # Chose not to do the Bonus
-    return [] # TODO: (BONUS) fix this
+    if random_state is not None:
+        if not isinstance(random_state, int):
+            raise ValueError('input random_state must be an integer')
+        np.random.seed((random_state + 1) * (random_state + 2))
+    if shuffle == True:
+        combined_list = list(zip(X,y))
+        combined_copy = combined_list.copy()
+        while True:
+            np.random.shuffle(combined_copy)
+            if not np.array_equal(combined_copy, combined_list):
+                X, y = zip(*combined_copy)
+                break
+
+    # make bins
+    bins = [[] for i in range(n_splits)]
+
+# go by unique value, and use mod to evenly distribute   
+    y_uniques = list(set(y))   
+    for val in y_uniques:
+        # find all indices with value:
+        index_group = [i for i in range(len(y)) if y[i] == val]
+        if shuffle == True:
+            np.random.shuffle(index_group)
+        for j, item in enumerate(index_group):
+            bins[j % n_splits].append(item)
+
+# should maintain ratios
+
+    folds = []
+    # go by fold
+    for group in range(n_splits):
+        # test is spec group
+        test_set = bins[group]
+        # train is all but spec group
+        train_set = [idx for i, b in enumerate(bins) if i != group for idx in b]
+        # tag to folds in tuple format
+        folds.append((train_set, test_set))
+    # just return folds
+    return folds
 
 def bootstrap_sample(X, y=None, n_samples=None, random_state=None):
     """Split dataset into bootstrapped training set and out of bag test set.
