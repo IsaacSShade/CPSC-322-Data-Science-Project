@@ -559,7 +559,7 @@ def random_subsample(classifier, X, y, k=10, test_size=0.33, random_state=None, 
   return mean_accuracy, mean_error, run_accuracies, run_errors
 
 
-def cross_val_predict(classifier, X, y, num_splits=10, random_state=None, shuffle=False):
+def cross_val_predict(classifier, X, y, num_splits=10, random_state=None, shuffle=False, stratified = False):
   """K-fold split -> fit -> predict -> accuracy/error.
 
   Parameters:
@@ -576,8 +576,10 @@ def cross_val_predict(classifier, X, y, num_splits=10, random_state=None, shuffl
     fold_predicted (list of float): The predicted values for each fold.
     fold_true (list of float): The true values for each fold.
   """
-  folds = myevaluation.kfold_split(X, n_splits=num_splits, random_state=random_state, shuffle=shuffle)
-
+  if stratified == False:
+    folds = myevaluation.kfold_split(X, n_splits=num_splits, random_state=random_state, shuffle=shuffle)
+  else:
+    folds = myevaluation.stratified_kfold_split(X, y = y, n_splits=num_splits, random_state=random_state, shuffle=shuffle)
   fold_accuracies = []
   fold_errors = []
   fold_predicted = []
