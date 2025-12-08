@@ -1,10 +1,10 @@
 # pylint: skip-file
 
 ##############################################
-# Programmer: Aiden Tabrah
+# Programmer: Aiden Tabrah and Valon Haslem
 # Class: CptS 322-01, Fall 2025
 # Programming Assignment: Project
-# 12/2/25
+# 12/7/25
 # 
 # Description: A variety of unit tests to ensure various sklearn accuracy
 ##############################################
@@ -18,7 +18,12 @@ from mysklearn.myclassifiers import MySimpleLinearRegressionClassifier,\
     MyDummyClassifier
 from mysklearn.myutils import discretizer_high_low_100
 import numpy as np
-from mysklearn.myclassifiers import MyDecisionTreeClassifier
+from mysklearn.myclassifiers import MyDecisionTreeClassifier, MyRandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.pipeline import make_pipeline
 
 # note: order is actual/received student value, expected/solution
 def test_simple_linear_regression_classifier_fit():    
@@ -807,3 +812,307 @@ def test_decision_tree_classifier_predict():
     y_predicted_iphone = iphone_classifier.predict(X_test_iphone)
     assert y_predicted_iphone == y_expected_iphone
 
+
+def test_random_forest_classifier_fit():
+    """Random forest fit should emulate sklearn's training accuracy on 3 toy datasets."""
+    np.random.seed(0)
+    
+    # --- in-class 8-instance example ---
+    X_train_inclass_example = [
+        [1, 5],  # yes
+        [2, 6],  # yes
+        [1, 5],  # no
+        [1, 5],  # no
+        [1, 6],  # yes
+        [2, 6],  # no
+        [1, 5],  # yes
+        [1, 6],  # yes
+    ]
+    y_train_inclass_example = ["yes", "yes", "no", "no", "yes", "no", "yes", "yes"]
+
+    # --- LA7 "iPhone purchases" fake data ---
+    X_train_iphone = [
+        [1, 3, "fair"],
+        [1, 3, "excellent"],
+        [2, 3, "fair"],
+        [2, 2, "fair"],
+        [2, 1, "fair"],
+        [2, 1, "excellent"],
+        [2, 1, "excellent"],
+        [1, 2, "fair"],
+        [1, 1, "fair"],
+        [2, 2, "fair"],
+        [1, 2, "excellent"],
+        [2, 2, "excellent"],
+        [2, 3, "fair"],
+        [2, 2, "excellent"],
+        [2, 3, "fair"],
+    ]
+    y_train_iphone = [
+        "no",
+        "no",
+        "yes",
+        "yes",
+        "yes",
+        "no",
+        "yes",
+        "no",
+        "yes",
+        "yes",
+        "yes",
+        "yes",
+        "yes",
+        "no",
+        "yes",
+    ]
+
+    # --- Bramer 3.2 train dataset ---
+    X_Brahmer_train = [
+        ["weekday", "spring", "none", "none"],
+        ["weekday", "winter", "none", "slight"],
+        ["weekday", "winter", "none", "slight"],
+        ["weekday", "winter", "high", "heavy"],
+        ["saturday", "summer", "normal", "none"],
+        ["weekday", "autumn", "normal", "none"],
+        ["holiday", "summer", "high", "slight"],
+        ["sunday", "summer", "normal", "none"],
+        ["weekday", "winter", "high", "heavy"],
+        ["weekday", "summer", "none", "slight"],
+        ["saturday", "spring", "high", "heavy"],
+        ["weekday", "summer", "high", "slight"],
+        ["saturday", "winter", "normal", "none"],
+        ["weekday", "summer", "high", "none"],
+        ["weekday", "winter", "normal", "heavy"],
+        ["saturday", "autumn", "high", "slight"],
+        ["weekday", "autumn", "none", "heavy"],
+        ["holiday", "spring", "normal", "slight"],
+        ["weekday", "spring", "normal", "none"],
+        ["weekday", "spring", "normal", "slight"],
+    ]
+    Y_Brahmer_train = [
+        "on time",
+        "on time",
+        "on time",
+        "late",
+        "on time",
+        "very late",
+        "on time",
+        "on time",
+        "very late",
+        "on time",
+        "cancelled",
+        "on time",
+        "late",
+        "on time",
+        "very late",
+        "on time",
+        "on time",
+        "on time",
+        "on time",
+        "on time",
+    ]
+
+    datasets = [
+        (X_train_inclass_example, y_train_inclass_example),
+        (X_train_iphone, y_train_iphone),
+        (X_Brahmer_train, Y_Brahmer_train),
+    ]
+
+    for X, y in datasets:
+        X_arr = np.array(X, dtype=object)
+        num_cols, cat_cols = [], []
+        for j in range(X_arr.shape[1]):
+            if isinstance(X_arr[0, j], str):
+                cat_cols.append(j)
+            else:
+                num_cols.append(j)
+
+        transformers = []
+        if num_cols:
+            transformers.append(("num", "passthrough", num_cols))
+        if cat_cols:
+            transformers.append(
+                ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols)
+            )
+
+        preprocessor = ColumnTransformer(transformers)
+        sk_rf = RandomForestClassifier(
+            n_estimators=50,
+            max_features="sqrt",
+            random_state=0,
+            bootstrap=True,
+        )
+        sk_model = make_pipeline(preprocessor, sk_rf)
+        sk_model.fit(X_arr, y)
+        sk_preds = sk_model.predict(X_arr)
+        sk_acc = accuracy_score(y, sk_preds)
+
+        n_features = len(X[0])
+        F = min(2, n_features)
+        my_rf = MyRandomForestClassifier(N=20, M=7, F=F)
+        my_rf.fit(X, y)
+
+        # We kept exactly M trees
+        assert len(my_rf.trees) == my_rf.M
+
+        my_preds = my_rf.predict(X)
+        my_acc = accuracy_score(y, my_preds)
+
+        # Emulate sklearn, accuracy should be in the same ballpark
+        # (allow some slack since algorithms aren't identical)
+        assert my_acc >= sk_acc - 0.20
+        assert my_acc <= 1.0
+
+def test_random_forest_classifier_predict():
+    """Random forest predictions should broadly agree with sklearn on 3 toy datasets."""
+    np.random.seed(0)
+    
+    # --- in-class 8-instance example ---
+    X_train_inclass_example = [
+        [1, 5],  # yes
+        [2, 6],  # yes
+        [1, 5],  # no
+        [1, 5],  # no
+        [1, 6],  # yes
+        [2, 6],  # no
+        [1, 5],  # yes
+        [1, 6],  # yes
+    ]
+    y_train_inclass_example = ["yes", "yes", "no", "no", "yes", "no", "yes", "yes"]
+
+    # --- LA7 "iPhone purchases" fake data ---
+    X_train_iphone = [
+        [1, 3, "fair"],
+        [1, 3, "excellent"],
+        [2, 3, "fair"],
+        [2, 2, "fair"],
+        [2, 1, "fair"],
+        [2, 1, "excellent"],
+        [2, 1, "excellent"],
+        [1, 2, "fair"],
+        [1, 1, "fair"],
+        [2, 2, "fair"],
+        [1, 2, "excellent"],
+        [2, 2, "excellent"],
+        [2, 3, "fair"],
+        [2, 2, "excellent"],
+        [2, 3, "fair"],
+    ]
+    y_train_iphone = [
+        "no",
+        "no",
+        "yes",
+        "yes",
+        "yes",
+        "no",
+        "yes",
+        "no",
+        "yes",
+        "yes",
+        "yes",
+        "yes",
+        "yes",
+        "no",
+        "yes",
+    ]
+
+    # --- Bramer 3.2 train dataset ---
+    X_Brahmer_train = [
+        ["weekday", "spring", "none", "none"],
+        ["weekday", "winter", "none", "slight"],
+        ["weekday", "winter", "none", "slight"],
+        ["weekday", "winter", "high", "heavy"],
+        ["saturday", "summer", "normal", "none"],
+        ["weekday", "autumn", "normal", "none"],
+        ["holiday", "summer", "high", "slight"],
+        ["sunday", "summer", "normal", "none"],
+        ["weekday", "winter", "high", "heavy"],
+        ["weekday", "summer", "none", "slight"],
+        ["saturday", "spring", "high", "heavy"],
+        ["weekday", "summer", "high", "slight"],
+        ["saturday", "winter", "normal", "none"],
+        ["weekday", "summer", "high", "none"],
+        ["weekday", "winter", "normal", "heavy"],
+        ["saturday", "autumn", "high", "slight"],
+        ["weekday", "autumn", "none", "heavy"],
+        ["holiday", "spring", "normal", "slight"],
+        ["weekday", "spring", "normal", "none"],
+        ["weekday", "spring", "normal", "slight"],
+    ]
+    Y_Brahmer_train = [
+        "on time",
+        "on time",
+        "on time",
+        "late",
+        "on time",
+        "very late",
+        "on time",
+        "on time",
+        "very late",
+        "on time",
+        "cancelled",
+        "on time",
+        "late",
+        "on time",
+        "very late",
+        "on time",
+        "on time",
+        "on time",
+        "on time",
+        "on time",
+    ]
+
+    datasets = [
+        (X_train_inclass_example, y_train_inclass_example),
+        (X_train_iphone, y_train_iphone),
+        (X_Brahmer_train, Y_Brahmer_train),
+    ]
+
+    for X, y in datasets:
+        # sklearn reference model
+        X_arr = np.array(X, dtype=object)
+        num_cols, cat_cols = [], []
+        for j in range(X_arr.shape[1]):
+            if isinstance(X_arr[0, j], str):
+                cat_cols.append(j)
+            else:
+                num_cols.append(j)
+
+        transformers = []
+        if num_cols:
+            transformers.append(("num", "passthrough", num_cols))
+        if cat_cols:
+            transformers.append(
+                ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols)
+            )
+
+        preprocessor = ColumnTransformer(transformers)
+        sk_rf = RandomForestClassifier(
+            n_estimators=50,
+            max_features="sqrt",
+            random_state=0,
+            bootstrap=True,
+        )
+        sk_model = make_pipeline(preprocessor, sk_rf)
+        sk_model.fit(X_arr, y)
+        sk_preds = sk_model.predict(X_arr)
+
+        # your forest
+        n_features = len(X[0])
+        F = min(2, n_features)
+        my_rf = MyRandomForestClassifier(N=20, M=7, F=F)
+        my_rf.fit(X, y)
+        my_preds = my_rf.predict(X)
+
+        # shape checks
+        assert len(my_preds) == len(sk_preds) == len(y)
+
+        # predictions should all be valid labels
+        possible_labels = set(y)
+        assert set(my_preds).issubset(possible_labels)
+
+        # agreement with sklearn
+        matches = sum(1 for a, b in zip(my_preds, sk_preds) if a == b)
+        agreement = matches / len(y)
+
+        assert agreement >= 0.7
