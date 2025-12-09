@@ -10,6 +10,7 @@
 import numpy as np
 from mysklearn import myutils
 from mysklearn.mysimplelinearregressor import MySimpleLinearRegressor
+from mysklearn.myevaluation import bootstrap_sample, accuracy_score
 
 class MySimpleLinearRegressionClassifier:
     """Represents a simple linear regression classifier that discretizes
@@ -512,7 +513,7 @@ class MyDecisionTreeClassifier:
         """
         pass # TODO: (BONUS) fix this
 
-from mysklearn.myevaluation import bootstrap_sample, accuracy_score
+
 class MyRandomForestClassifier:
     """Represents a Random Forest classifier.
 
@@ -523,19 +524,21 @@ class MyRandomForestClassifier:
     """
     
 
-    def __init__(self, N=20, M=7, F=2):
+    def __init__(self, N=20, M=7, F=2, random_state=0):
         """Initializer for Random Forest.
 
         Args:
             N (int): number of trees to generate
             M (int): number of best trees to keep
             F (int): number of random attributes per split
+            random_state (int): the randomness seed for random forest
         """
         self.N = N
         self.M = M
         self.F = F
         self.trees = []
         self.attribute_names = None
+        self.random_state = random_state
 
     def fit(self, X, y):
         """Fits the Random Forest model.
@@ -548,6 +551,13 @@ class MyRandomForestClassifier:
            c. Evaluate tree using its OOB samples
         3. Select top M trees
         """
+        
+        # local RNG so behavior is reproducible
+        if self.random_state is None:
+            rng = np.random.RandomState()
+        else:
+            rng = np.random.RandomState(self.random_state)
+            
         # Build attribute names
         num_features = len(X[0])
         self.attribute_names = ["att" + str(i) for i in range(num_features)]
@@ -556,41 +566,45 @@ class MyRandomForestClassifier:
 
         for _ in range(self.N):
             # Bootstrap sample
-            X_train, X_oob, y_train, y_oob = bootstrap_sample(X, y)
+            bootstrap_seed = int(rng.randint(0, 2**31 - 1))
+            X_train, X_oob, y_train, y_oob = bootstrap_sample(X, y, random_state=bootstrap_seed)
 
             # Combine training rows w/ labels
+            if X_train is None or y_train is None:
+                raise ValueError("X_train and y_train must not be None")
             train_instances = [xrow[:] + [y_val] for xrow, y_val in zip(X_train, y_train)]
-            available_attributes = list(range(num_features)) # take a subset right now
-            subset_attributes = myutils.compute_random_subset(available_attributes, self.F)
-
-            # Build tree with random attribute subsets
-            attribute_domains = [
-                                     set(instance[j] for instance in train_instances)
-                                     for j in range(num_features)
-                                 ]
+            available_attributes = list(range(num_features))
+            seed_subset = int(rng.randint(0, 2**31 - 1))
+            subset_attributes = myutils.compute_random_subset(available_attributes, self.F, random_state=seed_subset)
             
-            tree = myutils.tdidt(instances= train_instances,
-                                 available_attribute_indexes= subset_attributes,
-                                 attribute_domains= attribute_domains,
-                                 class_label_domain=set(y_train),
-                                 parent_instance_count= len(X_train))
+            # --- Deterministic domains ---
+            attribute_domains = []
+            for j in range(num_features):
+                values = {instance[j] for instance in train_instances}
+                attribute_domains.append(sorted(values))
+            
+            class_label_domain = sorted(set(y_train))
+            
+            tree = myutils.tdidt(
+                instances=train_instances,
+                available_attribute_indexes=subset_attributes,
+                attribute_domains=attribute_domains,
+                class_label_domain=class_label_domain,
+                parent_instance_count=len(X_train)
+            )
 
             # Evaluate using OOB set
             if len(X_oob) > 0:
-                preds = self.predict(X_oob, tree)
+                preds = self.predict(X_oob, t=tree)
                 score = accuracy_score(y_oob, preds)
             else:
-                score = 0.0  # no OOB samples, rare case
+                score = 0.0
 
             trees_with_scores.append((tree, score))
 
-        # Sort by descending accuracy
+        # Sort by descending accuracy and keep top M
         trees_with_scores.sort(key=lambda t: t[1], reverse=True)
-
-        # Keep top M
         self.trees = [t for t, _ in trees_with_scores[:self.M]]
-
-
 
     def predict(self, X_test, t = None):
         """Predicts labels for X_test using majority vote across M trees."""
@@ -605,9 +619,9 @@ class MyRandomForestClassifier:
                 predictions.append(myutils.vote(votes))
             return predictions
         
-        else: # tree has value
+        else:  # use a single tree
             predictions = []
             for x in X_test:
                 pred = myutils.classify_instance_with_tree(x, t)
-                predictions.append(t)
+                predictions.append(pred)
             return predictions

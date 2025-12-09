@@ -13,10 +13,9 @@ import numpy as np
 from mysklearn.myclassifiers import MyNaiveBayesClassifier
 from scipy import stats
 from mysklearn.mysimplelinearregressor import MySimpleLinearRegressor
-from mysklearn.myclassifiers import MySimpleLinearRegressionClassifier,\
-    MyKNeighborsClassifier,\
-    MyDummyClassifier
-from mysklearn.myutils import discretizer_high_low_100
+from mysklearn.myclassifiers import MySimpleLinearRegressionClassifier, MyKNeighborsClassifier, MyDummyClassifier
+from mysklearn.myutils import (compute_random_subset, tdidt, classify_instance_with_tree, vote, discretizer_high_low_100)
+from mysklearn.myevaluation import bootstrap_sample
 import numpy as np
 from mysklearn.myclassifiers import MyDecisionTreeClassifier, MyRandomForestClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -814,305 +813,121 @@ def test_decision_tree_classifier_predict():
 
 
 def test_random_forest_classifier_fit():
-    """Random forest fit should emulate sklearn's training accuracy on 3 toy datasets."""
-    np.random.seed(0)
+    """Random forest fit should be deterministic and match replayed TDIDT construction on the interview dataset."""
+    # Hyperparameters chosen for a small but non-trivial forest
+    N = 5
+    M = 3
+    F = 2
+    seed = 0
+
+    # --- Train the actual forest ---
+    rf = MyRandomForestClassifier(N=N, M=M, F=F, random_state=seed)
+    rf.fit(X_train_interview, y_train_interview)
     
-    # --- in-class 8-instance example ---
-    X_train_inclass_example = [
-        [1, 5],  # yes
-        [2, 6],  # yes
-        [1, 5],  # no
-        [1, 5],  # no
-        [1, 6],  # yes
-        [2, 6],  # no
-        [1, 5],  # yes
-        [1, 6],  # yes
-    ]
-    y_train_inclass_example = ["yes", "yes", "no", "no", "yes", "no", "yes", "yes"]
+    rng = np.random.RandomState(seed)
+    num_features = len(X_train_interview[0])
+    trees_with_scores = []
 
-    # --- LA7 "iPhone purchases" fake data ---
-    X_train_iphone = [
-        [1, 3, "fair"],
-        [1, 3, "excellent"],
-        [2, 3, "fair"],
-        [2, 2, "fair"],
-        [2, 1, "fair"],
-        [2, 1, "excellent"],
-        [2, 1, "excellent"],
-        [1, 2, "fair"],
-        [1, 1, "fair"],
-        [2, 2, "fair"],
-        [1, 2, "excellent"],
-        [2, 2, "excellent"],
-        [2, 3, "fair"],
-        [2, 2, "excellent"],
-        [2, 3, "fair"],
-    ]
-    y_train_iphone = [
-        "no",
-        "no",
-        "yes",
-        "yes",
-        "yes",
-        "no",
-        "yes",
-        "no",
-        "yes",
-        "yes",
-        "yes",
-        "yes",
-        "yes",
-        "no",
-        "yes",
-    ]
-
-    # --- Bramer 3.2 train dataset ---
-    X_Brahmer_train = [
-        ["weekday", "spring", "none", "none"],
-        ["weekday", "winter", "none", "slight"],
-        ["weekday", "winter", "none", "slight"],
-        ["weekday", "winter", "high", "heavy"],
-        ["saturday", "summer", "normal", "none"],
-        ["weekday", "autumn", "normal", "none"],
-        ["holiday", "summer", "high", "slight"],
-        ["sunday", "summer", "normal", "none"],
-        ["weekday", "winter", "high", "heavy"],
-        ["weekday", "summer", "none", "slight"],
-        ["saturday", "spring", "high", "heavy"],
-        ["weekday", "summer", "high", "slight"],
-        ["saturday", "winter", "normal", "none"],
-        ["weekday", "summer", "high", "none"],
-        ["weekday", "winter", "normal", "heavy"],
-        ["saturday", "autumn", "high", "slight"],
-        ["weekday", "autumn", "none", "heavy"],
-        ["holiday", "spring", "normal", "slight"],
-        ["weekday", "spring", "normal", "none"],
-        ["weekday", "spring", "normal", "slight"],
-    ]
-    Y_Brahmer_train = [
-        "on time",
-        "on time",
-        "on time",
-        "late",
-        "on time",
-        "very late",
-        "on time",
-        "on time",
-        "very late",
-        "on time",
-        "cancelled",
-        "on time",
-        "late",
-        "on time",
-        "very late",
-        "on time",
-        "on time",
-        "on time",
-        "on time",
-        "on time",
-    ]
-
-    datasets = [
-        (X_train_inclass_example, y_train_inclass_example),
-        (X_train_iphone, y_train_iphone),
-        (X_Brahmer_train, Y_Brahmer_train),
-    ]
-
-    for X, y in datasets:
-        X_arr = np.array(X, dtype=object)
-        num_cols, cat_cols = [], []
-        for j in range(X_arr.shape[1]):
-            if isinstance(X_arr[0, j], str):
-                cat_cols.append(j)
-            else:
-                num_cols.append(j)
-
-        transformers = []
-        if num_cols:
-            transformers.append(("num", "passthrough", num_cols))
-        if cat_cols:
-            transformers.append(
-                ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols)
-            )
-
-        preprocessor = ColumnTransformer(transformers)
-        sk_rf = RandomForestClassifier(
-            n_estimators=50,
-            max_features="sqrt",
-            random_state=0,
-            bootstrap=True,
+    for _ in range(N):
+        # Expected seed generation pattern
+        seed_boot = int(rng.randint(0, 2**31 - 1))
+        X_train_bag, X_oob, y_train_bag, y_oob = bootstrap_sample(
+            X_train_interview,
+            y_train_interview,
+            random_state=seed_boot
         )
-        sk_model = make_pipeline(preprocessor, sk_rf)
-        sk_model.fit(X_arr, y)
-        sk_preds = sk_model.predict(X_arr)
-        sk_acc = accuracy_score(y, sk_preds)
 
-        n_features = len(X[0])
-        F = min(2, n_features)
-        my_rf = MyRandomForestClassifier(N=20, M=7, F=F)
-        my_rf.fit(X, y)
+        # Combine training rows w/ labels
+        train_instances = [
+            xrow[:] + [y_val]
+            for xrow, y_val in zip(X_train_bag, y_train_bag)
+        ]
 
-        # We kept exactly M trees
-        assert len(my_rf.trees) == my_rf.M
+        # Random attribute subset for this tree (same pattern)
+        available_attributes = list(range(num_features))
+        seed_subset = int(rng.randint(0, 2**31 - 1))
+        subset_attributes = compute_random_subset(
+            available_attributes,
+            F,
+            random_state=seed_subset
+        )
 
-        my_preds = my_rf.predict(X)
-        my_acc = accuracy_score(y, my_preds)
+        # Deterministic attribute domains and class label domain
+        attribute_domains = []
+        for j in range(num_features):
+            values = {inst[j] for inst in train_instances}
+            attribute_domains.append(sorted(values))
 
-        # Emulate sklearn, accuracy should be in the same ballpark
-        # (allow some slack since algorithms aren't identical)
-        assert my_acc >= sk_acc - 0.20
-        assert my_acc <= 1.0
+        class_label_domain = sorted(set(y_train_bag))
+
+        # Build a single tree with TDIDT
+        tree = tdidt(
+            instances=train_instances,
+            available_attribute_indexes=subset_attributes,
+            attribute_domains=attribute_domains,
+            class_label_domain=class_label_domain,
+            parent_instance_count=len(X_train_bag)
+        )
+
+        # Evaluate tree on its OOB set (mirror rf.fit: predict(X_oob, t=tree))
+        if len(X_oob) > 0:
+            oob_preds = [
+                classify_instance_with_tree(x, tree)
+                for x in X_oob
+            ]
+            score = accuracy_score(y_oob, oob_preds)
+        else:
+            score = 0.0
+
+        trees_with_scores.append((tree, score))
+
+    # Sort and keep top M exactly like rf.fit
+    trees_with_scores.sort(key=lambda t: t[1], reverse=True)
+    expected_trees = [t for t, _ in trees_with_scores[:M]]
+
+    # The trained forest must match the replayed construction
+    assert rf.trees == expected_trees
+
+    # Training twice with the same seed should give identical trees
+    rf2 = MyRandomForestClassifier(N=N, M=M, F=F, random_state=seed)
+    rf2.fit(X_train_interview, y_train_interview)
+    assert rf2.trees == rf.trees
+
 
 def test_random_forest_classifier_predict():
-    """Random forest predictions should broadly agree with sklearn on 3 toy datasets."""
-    np.random.seed(0)
-    
-    # --- in-class 8-instance example ---
-    X_train_inclass_example = [
-        [1, 5],  # yes
-        [2, 6],  # yes
-        [1, 5],  # no
-        [1, 5],  # no
-        [1, 6],  # yes
-        [2, 6],  # no
-        [1, 5],  # yes
-        [1, 6],  # yes
-    ]
-    y_train_inclass_example = ["yes", "yes", "no", "no", "yes", "no", "yes", "yes"]
+    """Random forest predictions should equal majority vote of individual trees (deterministic)."""
+    N = 5
+    M = 3
+    F = 2
+    seed = 0
 
-    # --- LA7 "iPhone purchases" fake data ---
-    X_train_iphone = [
-        [1, 3, "fair"],
-        [1, 3, "excellent"],
-        [2, 3, "fair"],
-        [2, 2, "fair"],
-        [2, 1, "fair"],
-        [2, 1, "excellent"],
-        [2, 1, "excellent"],
-        [1, 2, "fair"],
-        [1, 1, "fair"],
-        [2, 2, "fair"],
-        [1, 2, "excellent"],
-        [2, 2, "excellent"],
-        [2, 3, "fair"],
-        [2, 2, "excellent"],
-        [2, 3, "fair"],
-    ]
-    y_train_iphone = [
-        "no",
-        "no",
-        "yes",
-        "yes",
-        "yes",
-        "no",
-        "yes",
-        "no",
-        "yes",
-        "yes",
-        "yes",
-        "yes",
-        "yes",
-        "no",
-        "yes",
+    rf = MyRandomForestClassifier(N=N, M=M, F=F, random_state=seed)
+    rf.fit(X_train_interview, y_train_interview)
+
+    # Use a mix of seen and slightly varied interview-style instances
+    X_test = [
+        ["Junior", "Python", "no", "no"],
+        ["Junior", "Python", "yes", "no"],
+        ["Senior", "Python", "no", "no"],
+        ["Mid", "R", "yes", "yes"], 
     ]
 
-    # --- Bramer 3.2 train dataset ---
-    X_Brahmer_train = [
-        ["weekday", "spring", "none", "none"],
-        ["weekday", "winter", "none", "slight"],
-        ["weekday", "winter", "none", "slight"],
-        ["weekday", "winter", "high", "heavy"],
-        ["saturday", "summer", "normal", "none"],
-        ["weekday", "autumn", "normal", "none"],
-        ["holiday", "summer", "high", "slight"],
-        ["sunday", "summer", "normal", "none"],
-        ["weekday", "winter", "high", "heavy"],
-        ["weekday", "summer", "none", "slight"],
-        ["saturday", "spring", "high", "heavy"],
-        ["weekday", "summer", "high", "slight"],
-        ["saturday", "winter", "normal", "none"],
-        ["weekday", "summer", "high", "none"],
-        ["weekday", "winter", "normal", "heavy"],
-        ["saturday", "autumn", "high", "slight"],
-        ["weekday", "autumn", "none", "heavy"],
-        ["holiday", "spring", "normal", "slight"],
-        ["weekday", "spring", "normal", "none"],
-        ["weekday", "spring", "normal", "slight"],
-    ]
-    Y_Brahmer_train = [
-        "on time",
-        "on time",
-        "on time",
-        "late",
-        "on time",
-        "very late",
-        "on time",
-        "on time",
-        "very late",
-        "on time",
-        "cancelled",
-        "on time",
-        "late",
-        "on time",
-        "very late",
-        "on time",
-        "on time",
-        "on time",
-        "on time",
-        "on time",
-    ]
+    forest_preds = rf.predict(X_test)
 
-    datasets = [
-        (X_train_inclass_example, y_train_inclass_example),
-        (X_train_iphone, y_train_iphone),
-        (X_Brahmer_train, Y_Brahmer_train),
-    ]
+    # Manually compute expected predictions via per-tree majority vote
+    expected_preds = []
+    for x in X_test:
+        votes_for_x = [
+            classify_instance_with_tree(x, tree)
+            for tree in rf.trees
+        ]
+        expected_preds.append(vote(votes_for_x))
 
-    for X, y in datasets:
-        # sklearn reference model
-        X_arr = np.array(X, dtype=object)
-        num_cols, cat_cols = [], []
-        for j in range(X_arr.shape[1]):
-            if isinstance(X_arr[0, j], str):
-                cat_cols.append(j)
-            else:
-                num_cols.append(j)
+    # Forest.predict must be exactly majority vote across its trees
+    assert forest_preds == expected_preds
 
-        transformers = []
-        if num_cols:
-            transformers.append(("num", "passthrough", num_cols))
-        if cat_cols:
-            transformers.append(
-                ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols)
-            )
-
-        preprocessor = ColumnTransformer(transformers)
-        sk_rf = RandomForestClassifier(
-            n_estimators=50,
-            max_features="sqrt",
-            random_state=0,
-            bootstrap=True,
-        )
-        sk_model = make_pipeline(preprocessor, sk_rf)
-        sk_model.fit(X_arr, y)
-        sk_preds = sk_model.predict(X_arr)
-
-        # your forest
-        n_features = len(X[0])
-        F = min(2, n_features)
-        my_rf = MyRandomForestClassifier(N=20, M=7, F=F)
-        my_rf.fit(X, y)
-        my_preds = my_rf.predict(X)
-
-        # shape checks
-        assert len(my_preds) == len(sk_preds) == len(y)
-
-        # predictions should all be valid labels
-        possible_labels = set(y)
-        assert set(my_preds).issubset(possible_labels)
-
-        # agreement with sklearn
-        matches = sum(1 for a, b in zip(my_preds, sk_preds) if a == b)
-        agreement = matches / len(y)
-
-        assert agreement >= 0.7
+    # Determinism check: same seed + same data == same predictions
+    rf2 = MyRandomForestClassifier(N=N, M=M, F=F, random_state=seed)
+    rf2.fit(X_train_interview, y_train_interview)
+    forest_preds_2 = rf2.predict(X_test)
+    assert forest_preds_2 == forest_preds

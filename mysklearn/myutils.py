@@ -89,11 +89,12 @@ def all_same_class(instances):
     # if the loop completes without finding differences, return True.
     return True 
 
-def compute_random_subset(values, num_values):
-    # let's use np.random.shuffle()
-    values_copy = values.copy()
-    np.random.shuffle(values_copy) # inplace
-    return values_copy[:num_values]
+def compute_random_subset(values, num_values, random_state=None):
+  """Return a random subset of size num_values from values, using an optional seed."""
+  values_copy = values.copy()
+  rng = np.random.RandomState(random_state)
+  rng.shuffle(values_copy)  # in-place, but seeded
+  return values_copy[:num_values]
 
 def vote(vals):
     '''
